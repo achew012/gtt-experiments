@@ -7,7 +7,6 @@ import pytorch_lightning as pl
 import torch
 
 from transformers import (
-    ALL_PRETRAINED_MODEL_ARCHIVE_MAP,
     AdamW,
     AutoConfig,
     AutoModel,
@@ -19,14 +18,12 @@ from transformers import (
     AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
-from transformers.modeling_auto import MODEL_MAPPING
-
 
 logger = logging.getLogger(__name__)
 
 
-ALL_MODELS = tuple(ALL_PRETRAINED_MODEL_ARCHIVE_MAP)
-MODEL_CLASSES = tuple(m.model_type for m in MODEL_MAPPING)
+# ALL_MODELS = tuple(ALL_PRETRAINED_MODEL_ARCHIVE_MAP)
+# MODEL_CLASSES = tuple(m.model_type for m in MODEL_MAPPING)
 
 MODEL_MODES = {
     "base": AutoModel,

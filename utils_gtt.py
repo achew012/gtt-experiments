@@ -22,9 +22,12 @@ import json
 import numpy as np
 from collections import OrderedDict
 
-f = open("/data/wikievents/muc_format/template_dicts.json")
-incident_token_to_type = json.load(f)
-# incident_token_to_type = {'kidnapping': 'kidnapping', 'attack': 'attack', 'bombing': 'bombing', 'robbery': 'robbery', 'arson': 'arson', 'forced': 'forced work stoppage'} # for decoding
+config = json.load(open('config.json'))
+
+if config["wikievents"]=="True":
+    incident_token_to_type = json.load(open("{}/template_dicts.json".format(config["data_dir"])))
+else:
+    incident_token_to_type = {'kidnapping': 'kidnapping', 'attack': 'attack', 'bombing': 'bombing', 'robbery': 'robbery', 'arson': 'arson', 'forced': 'forced work stoppage'} # for decoding
 
 logger = logging.getLogger(__name__)
 

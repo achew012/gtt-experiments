@@ -439,9 +439,12 @@ class NERTransformer(BaseTransformer):
                     for temp_raw in temps_extract:
                         temp = OrderedDict()
                         template_name = temp_raw[0][0][0]
-                        with open('/data/wikievents/muc_format/role_dicts.json') as f:
-                            role_dict = json.load(f)
-                        role_list = ['incident_type'] + role_dict[template_name]
+                        
+                        if self.hparams.wikievents:
+                            with open('/data/wikievents/muc_format/role_dicts.json') as f:
+                                role_dict = json.load(f)
+                            role_list = ['incident_type'] + role_dict[template_name]
+
                         for idx, role in enumerate(role_list):
                             temp[role] = []
                             if idx+1 > len(temp_raw):
@@ -555,14 +558,19 @@ class bucket_ops:
     def upload_file(local_path:str, remote_path:str):
         StorageManager.upload_file(local_path, remote_path, wait_for_upload=True, retries=3)
 
-dataset = Dataset.get(dataset_name="collated-data", dataset_project="datasets/ace05-event", dataset_tags=["original"], only_published=True)
-dataset_folder = dataset.get_local_copy()
-# if os.path.exists(dataset_folder)==False:
-os.symlink(os.path.join(dataset_folder, "data", "data"), "{}/data".format(os.getcwd()))
 
 
 #Read args from config file instead, use vars() to convert namespace to dict
 config = json.load(open('config.json'))
+
+dataset = Dataset.get(dataset_name="muc4-processed", dataset_project="datasets/muc4", dataset_tags=["processed"], only_published=True)
+dataset_folder = dataset.get_local_copy()
+
+print(dataset_folder)
+
+# if os.path.exists(dataset_folder)==False:
+os.symlink(os.path.join(dataset_folder, "data"), config["data_dir"])
+
 args = argparse.Namespace(**config['default'])
 global_args = args
 
@@ -571,8 +579,8 @@ model.hparams = args
 
 trainer = generic_train(model, args)
 result = trainer.test(model)            
-#model = NERTransformer.load_from_checkpoint('/models/gtt.ckpt')
 
+#model = NERTransformer.load_from_checkpoint('/models/gtt.ckpt')
 
 
 
