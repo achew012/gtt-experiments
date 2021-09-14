@@ -22,7 +22,7 @@ import json
 import numpy as np
 from collections import OrderedDict
 
-config = json.load(open('config.json'))
+config = json.load(open('config.json'))["default"]
 
 if config["wikievents"]=="True":
     incident_token_to_type = json.load(open("{}/template_dicts.json".format(config["data_dir"])))

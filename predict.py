@@ -10,7 +10,7 @@ task = Task.init(project_name='GTT', task_name='baseGTT', output_uri="s3://exper
 task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
 
 config = json.load(open('config.json'))
-args = argparse.Namespace(**config)
+args = argparse.Namespace(**config["default"])
 task.connect(args)
 
 task.execute_remotely(queue_name="default", exit_process=True)
@@ -37,7 +37,7 @@ from utils_gtt import convert_examples_to_features, get_labels, read_examples_fr
 
 role_list = ["incident_type", "PerpInd", "PerpOrg", "Target", "Victim", "Weapon"]
 
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -56,11 +56,11 @@ class NERTransformer(BaseTransformer):
 
     def __init__(self, hparams):
         self.pad_token_label_id = CrossEntropyLoss().ignore_index
-        # super(NERTransformer, self).__init__(hparams, num_labels, self.mode)
-        
+        # super(NERTransformer, self).__init__(hparams, num_labels, self.mode)        
+
         super(NERTransformer, self).__init__(hparams, self.mode)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() and self.hparams.n_gpu else "cpu")
+        self.device = device
         # n_gpu = torch.cuda.device_count()
         # self.MASK = tokenizer.convert_tokens_to_ids(['[MASK]'])[0]
         self.SEP = self.tokenizer.convert_tokens_to_ids(['[SEP]'])[0]
@@ -561,19 +561,14 @@ class bucket_ops:
 
 
 #Read args from config file instead, use vars() to convert namespace to dict
-config = json.load(open('config.json'))
-
 dataset = Dataset.get(dataset_name="muc4-processed", dataset_project="datasets/muc4", dataset_tags=["processed"], only_published=True)
 dataset_folder = dataset.get_local_copy()
-
 print(dataset_folder)
 
 # if os.path.exists(dataset_folder)==False:
-os.symlink(os.path.join(dataset_folder, "data"), config["data_dir"])
+os.symlink(os.path.join(dataset_folder, "data"), args.data_dir)
 
-args = argparse.Namespace(**config['default'])
 global_args = args
-
 model = NERTransformer(args)
 model.hparams = args
 
