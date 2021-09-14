@@ -2,7 +2,7 @@ from clearml import Task, StorageManager, Dataset
 import argparse
 import json
 
-Task.add_requirements('transformers', package_version='4.2.0')
+#Task.add_requirements('transformers', package_version='4.2.0')
 task = Task.init(project_name='GTT', task_name='baseGTT', output_uri="s3://experiment-logging/storage/")
 
 #task.set_base_docker("nvcr.io/nvidia/pytorch:21.05-py3")
@@ -37,7 +37,6 @@ from utils_gtt import convert_examples_to_features, get_labels, read_examples_fr
 
 role_list = ["incident_type", "PerpInd", "PerpOrg", "Target", "Victim", "Weapon"]
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ class NERTransformer(BaseTransformer):
     """
     A training module for single-transformer-ee. See BaseTransformer for the core options.
     """
-
+    device = torch.device("cuda")
     mode = "base"
 
     def __init__(self, hparams):
