@@ -4,9 +4,6 @@ import json
 
 #Task.add_requirements('transformers', package_version='4.2.0')
 task = Task.init(project_name='GTT', task_name='baseGTT', output_uri="s3://experiment-logging/storage/")
-
-#task.set_base_docker("nvcr.io/nvidia/pytorch:21.05-py3")
-#task.set_base_docker("default-base")
 task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
 
 config = json.load(open('config.json'))
@@ -15,7 +12,6 @@ task.connect(args)
 
 task.execute_remotely(queue_name="default", exit_process=True)
 clearlogger = task.get_logger()
-
 
 import argparse
 import glob
@@ -32,13 +28,49 @@ from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, TensorDataset
 import jsonlines
 
+
+class bucket_ops:
+    StorageManager.set_cache_file_limit(5, cache_context=None)
+
+    def list(remote_path:str):
+        return StorageManager.list(remote_path, return_full_path=False)
+
+    def upload_folder(local_path:str, remote_path:str):
+        StorageManager.upload_folder(local_path, remote_path, match_wildcard=None)
+        print("Uploaded {}".format(local_path))
+
+    def download_folder(local_path:str, remote_path:str):
+        StorageManager.download_folder(remote_path, local_path, match_wildcard=None, overwrite=True)
+        print("Downloaded {}".format(remote_path))
+    
+    def get_file(remote_path:str):        
+        object = StorageManager.get_local_copy(remote_path)
+        return object
+
+    def upload_file(local_path:str, remote_path:str):
+        StorageManager.upload_file(local_path, remote_path, wait_for_upload=True, retries=3)
+
+#Download Pretrained Models
+bucket_ops.download_folder(
+    local_path="/models/bert-base-uncased", 
+    remote_path="s3://experiment-logging/pretrained/bert-base-uncased", 
+    )
+
+#Read args from config file instead, use vars() to convert namespace to dict
+dataset = Dataset.get(dataset_name="wikievents-muc4", dataset_project="datasets/wikievents", dataset_tags=["muc4-format"], only_published=True)
+dataset_folder = dataset.get_local_copy()
+print(list(os.walk(dataset_folder)))
+
+# if os.path.exists(dataset_folder)==False:
+os.symlink(os.path.join(dataset_folder, "data/wikievents/muc_format"), args.data_dir)
+
 from transformer_base import BaseTransformer, add_generic_args, generic_train
 from utils_gtt import convert_examples_to_features, get_labels, read_examples_from_file, read_golds_from_test_file, not_sub_string, incident_token_to_type
 
 role_list = ["incident_type", "PerpInd", "PerpOrg", "Target", "Victim", "Weapon"]
-
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger(__name__)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def to_jsonl(filename:str, file_obj):
@@ -50,16 +82,14 @@ class NERTransformer(BaseTransformer):
     """
     A training module for single-transformer-ee. See BaseTransformer for the core options.
     """
-    device = torch.device("cuda")
     mode = "base"
 
     def __init__(self, hparams):
         self.pad_token_label_id = CrossEntropyLoss().ignore_index
+        self.device = device
         # super(NERTransformer, self).__init__(hparams, num_labels, self.mode)        
 
         super(NERTransformer, self).__init__(hparams, self.mode)
-
-        self.device = device
         # n_gpu = torch.cuda.device_count()
         # self.MASK = tokenizer.convert_tokens_to_ids(['[MASK]'])[0]
         self.SEP = self.tokenizer.convert_tokens_to_ids(['[SEP]'])[0]
@@ -198,8 +228,8 @@ class NERTransformer(BaseTransformer):
         i = max_seq_length_src
         src_input_ids = batch[0][:, :max_seq_length_src]
         src_position_ids = batch[3][:, :max_seq_length_src]
-        tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]).to(self.device), torch.tensor([[self.CLS]]).to(self.device)
-        tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]).to(self.device), torch.tensor([[0]]).to(self.device)
+        tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]).to(device), torch.tensor([[self.CLS]]).to(device)
+        tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]).to(device), torch.tensor([[0]]).to(device)
 
         # get out_input_id_list (pred_seq)
         while i <= max_seq_length_src + max_seq_length_tgt - 1:
@@ -536,44 +566,12 @@ class NERTransformer(BaseTransformer):
         return parser
 
 
-class bucket_ops:
-    StorageManager.set_cache_file_limit(5, cache_context=None)
-
-    def list(remote_path:str):
-        return StorageManager.list(remote_path, return_full_path=False)
-
-    def upload_folder(local_path:str, remote_path:str):
-        StorageManager.upload_folder(local_path, remote_path, match_wildcard=None)
-        print("Uploaded {}".format(local_path))
-
-    def download_folder(local_path:str, remote_path:str):
-        StorageManager.download_folder(remote_path, local_path, match_wildcard=None, overwrite=True)
-        print("Downloaded {}".format(remote_path))
-    
-    def get_file(remote_path:str):        
-        object = StorageManager.get_local_copy(remote_path)
-        return object
-
-    def upload_file(local_path:str, remote_path:str):
-        StorageManager.upload_file(local_path, remote_path, wait_for_upload=True, retries=3)
-
-
-
-#Read args from config file instead, use vars() to convert namespace to dict
-dataset = Dataset.get(dataset_name="muc4-processed", dataset_project="datasets/muc4", dataset_tags=["processed"], only_published=True)
-dataset_folder = dataset.get_local_copy()
-print(dataset_folder)
-
-# if os.path.exists(dataset_folder)==False:
-os.symlink(os.path.join(dataset_folder, "data"), args.data_dir)
-
 global_args = args
 model = NERTransformer(args)
 model.hparams = args
 
 trainer = generic_train(model, args)
 result = trainer.test(model)            
-
 #model = NERTransformer.load_from_checkpoint('/models/gtt.ckpt')
 
 

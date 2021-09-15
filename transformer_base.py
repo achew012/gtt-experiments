@@ -72,7 +72,7 @@ class BaseTransformer(pl.LightningModule):
         
 
     def is_logger(self):
-        return self.trainer.proc_rank <= 0
+        return True
 
     def configure_optimizers(self):
         "Prepare optimizer and schedule (linear warmup and decay)"
@@ -93,13 +93,13 @@ class BaseTransformer(pl.LightningModule):
         self.opt = optimizer
         return [optimizer]
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, second_order_closure=None):
-        if self.trainer.use_tpu:
-            xm.optimizer_step(optimizer)
-        else:
-            optimizer.step()
-        optimizer.zero_grad()
-        self.lr_scheduler.step()
+    # def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx, second_order_closure=None):
+    #     if self.trainer.use_tpu:
+    #         xm.optimizer_step(optimizer)
+    #     else:
+    #         optimizer.step()
+    #     optimizer.zero_grad()
+    #     self.lr_scheduler.step()
 
     def get_tqdm_dict(self):
         tqdm_dict = {"loss": "{:.3f}".format(self.trainer.avg_loss), "lr": self.lr_scheduler.get_last_lr()[-1]}
@@ -258,7 +258,6 @@ def add_generic_args(parser, root_dir):
 def generic_train(model, args):
     # init model
     set_seed(args)
-    
 
     # Setup distant debugging if needed
     if args.server_ip and args.server_port:
@@ -271,31 +270,27 @@ def generic_train(model, args):
 
     # if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train:
     #     raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
-
+ 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filepath=args.output_dir, prefix="checkpoint", monitor="val_accuracy", mode="max", save_top_k=5
+        dirpath = "../outputs/",
+        filename="best-grit-model", 
+        monitor="val_accuracy", 
+        mode="max", 
+        save_top_k=1, 
+        save_weights_only=True
     )
-
+ 
     train_params = dict(
         accumulate_grad_batches=args.gradient_accumulation_steps,
-        gpus=args.n_gpu,
+        gpus=args.n_gpu,        
         max_epochs=args.num_train_epochs,
-        early_stop_callback=False,
         gradient_clip_val=args.max_grad_norm,
-        checkpoint_callback=checkpoint_callback,
-        callbacks=[LoggingCallback()],
+        callbacks=[LoggingCallback(), checkpoint_callback],
     )
 
     if args.fp16:
         train_params["use_amp"] = args.fp16
         train_params["amp_level"] = args.fp16_opt_level
-
-    if args.n_tpu_cores > 0:
-        global xm
-        import torch_xla.core.xla_model as xm
-
-        train_params["num_tpu_cores"] = args.n_tpu_cores
-        train_params["gpus"] = 0
 
     if args.n_gpu > 1:
         train_params["distributed_backend"] = "ddp"
