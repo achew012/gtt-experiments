@@ -23,7 +23,7 @@
     "n_gpu": 1,
     "n_tpu_cores": 0,
     "num_train_epochs": 1,
-    "output_dir": "/data/outputs",
+    "output_dir": "/outputs",
     "overwrite_cache": "True",
     "seed": 1,
     "server_ip": "",

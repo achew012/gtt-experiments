@@ -86,7 +86,7 @@ class NERTransformer(BaseTransformer):
 
     def __init__(self, hparams):
         self.pad_token_label_id = CrossEntropyLoss().ignore_index
-        self.device = device
+        # self.device = device
         # super(NERTransformer, self).__init__(hparams, num_labels, self.mode)        
 
         super(NERTransformer, self).__init__(hparams, self.mode)
@@ -230,6 +230,9 @@ class NERTransformer(BaseTransformer):
         src_position_ids = batch[3][:, :max_seq_length_src]
         tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]).to(device), torch.tensor([[self.CLS]]).to(device)
         tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]).to(device), torch.tensor([[0]]).to(device)
+
+        # tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]), torch.tensor([[self.CLS]])
+        # tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]), torch.tensor([[0]])
 
         # get out_input_id_list (pred_seq)
         while i <= max_seq_length_src + max_seq_length_tgt - 1:
@@ -510,11 +513,13 @@ class NERTransformer(BaseTransformer):
 
         logger.info("writing preds to .out file:")
         if args.debug:
-            with open("preds_gtt_debug.out", "w+") as f:
-                f.write(json.dumps(preds_log, indent=4))            
+            task.upload_artifact('preds_debug', preds_log)
+            #with open("preds_gtt_debug.out", "w+") as f:
+            #    f.write(json.dumps(preds_log, indent=4))            
         else:
-            with open("preds_gtt.out", "w+") as f:
-                f.write(json.dumps(preds_log, indent=4))
+            task.upload_artifact('preds', preds_log)
+            #with open("preds_gtt.out", "w+") as f:
+            #    f.write(json.dumps(preds_log, indent=4))
 
         # import ipdb; ipdb.set_trace()
 

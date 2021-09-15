@@ -206,13 +206,18 @@ class LoggingCallback(pl.Callback):
         if pl_module.is_logger():
             metrics = trainer.callback_metrics
 
-            # Log and save results to file
-            output_test_results_file = os.path.join(pl_module.hparams.output_dir, "test_results.txt")
-            with open(output_test_results_file, "w") as writer:
-                for key in sorted(metrics):
+            for key in sorted(metrics):
                     if key not in ["log", "progress_bar"]:
                         logger.info("{} = {}\n".format(key, str(metrics[key])))
-                        writer.write("{} = {}\n".format(key, str(metrics[key])))
+            #             writer.write("{} = {}\n".format(key, str(metrics[key])))
+
+            # Log and save results to file
+            # output_test_results_file = os.path.join(pl_module.hparams.output_dir, "test_results.txt")
+            # with open(output_test_results_file, "w") as writer:
+            #     for key in sorted(metrics):
+            #         if key not in ["log", "progress_bar"]:
+            #             logger.info("{} = {}\n".format(key, str(metrics[key])))
+            #             writer.write("{} = {}\n".format(key, str(metrics[key])))
 
 
 def add_generic_args(parser, root_dir):
