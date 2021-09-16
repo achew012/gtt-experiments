@@ -3,14 +3,14 @@ import argparse
 import json
 
 #Task.add_requirements('transformers', package_version='4.2.0')
-task = Task.init(project_name='GTT', task_name='predict', output_uri="s3://experiment-logging/storage/")
+task = Task.init(project_name='GTT', task_name='prediction', output_uri="s3://experiment-logging/storage/")
 task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
 
 config = json.load(open('config.json'))
 args = argparse.Namespace(**config["default"])
 task.connect(args)
 
-task.execute_remotely(queue_name="default", exit_process=True)
+task.execute_remotely(queue_name="128RAMv100", exit_process=True)
 clearlogger = task.get_logger()
 
 import argparse
