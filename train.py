@@ -3,7 +3,7 @@ import argparse
 import json
 
 #Task.add_requirements('transformers', package_version='4.2.0')
-task = Task.init(project_name='GTT', task_name='baseGTT', output_uri="s3://experiment-logging/storage/")
+task = Task.init(project_name='GTT', task_name='predict', output_uri="s3://experiment-logging/storage/")
 task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
 
 config = json.load(open('config.json'))
@@ -473,7 +473,7 @@ class NERTransformer(BaseTransformer):
                         template_name = temp_raw[0][0][0]
                         
                         if self.hparams.wikievents:
-                            with open('/data/wikievents/muc_format/role_dicts.json') as f:
+                            with open('{}/role_dicts.json'.format(self.hparams.data_dir)) as f:
                                 role_dict = json.load(f)
                             role_list = ['incident_type'] + role_dict[template_name]
 
@@ -572,38 +572,17 @@ class NERTransformer(BaseTransformer):
 
 
 global_args = args
-model = NERTransformer(args)
-model.hparams = args
+
+if args.do_train ==False:
+    bucket_ops.download_folder(
+        local_path="/models/", 
+        remote_path="s3://experiment-logging/storage/GTT/fullGTT.bf5b1dafdc624f8b8ac90d2f1bf28a66/models/", 
+        )
+    model = NERTransformer.load_from_checkpoint('/models/best-grit-model.ckpt')
+else:
+    model = NERTransformer(args)
 
 trainer = generic_train(model, args)
-result = trainer.test(model)            
-#model = NERTransformer.load_from_checkpoint('/models/gtt.ckpt')
-
-
-
-# from fastapi import FastAPI, Request
-# from typing import List, Dict, Any, Optional
-# from pydantic import BaseModel, Field
-# from fastapi.exceptions import HTTPException
-# from asyncio import Lock, sleep
-# from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
-
-# lock = Lock()
-# app = FastAPI()
-
-# @app.post("/predict")
-# async def read_root(request: Request):
-#     data = await request.json()
-#     if data:
-#         #to_jsonl('{}/test.json'.format(args.data_dir), data)
-#         if lock.locked():
-#             raise HTTPException(status_code=HTTP_503_SERVICE_UNAVAILABLE, detail="Service busy")
-#         async with lock:
-#             print('processing gtt...')
-#             result = trainer.test(model)            
-#             print(result)
-#             torch.cuda.empty_cache()
-#             return result
-#     else:
-#         torch.cuda.empty_cache()
-#         return None
+result = trainer.test(model)
+task.upload_artifact("predictions", result)
+task.close()

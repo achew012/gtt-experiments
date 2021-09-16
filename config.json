@@ -8,7 +8,7 @@
     "debug": "",
     "do_lower_case": "False",
     "do_predict": "True",
-    "do_train": "True",
+    "do_train": "False",
     "eval_batch_size": 1,
     "fp16": "",
     "fp16_opt_level": "O1",
@@ -22,7 +22,7 @@
     "model_type": "bert",
     "n_gpu": 1,
     "n_tpu_cores": 0,
-    "num_train_epochs": 1,
+    "num_train_epochs": 50,
     "output_dir": "/outputs",
     "overwrite_cache": "True",
     "seed": 1,
@@ -30,7 +30,7 @@
     "server_port": "",
     "thresh": 1,
     "tokenizer_name": "",
-    "train_batch_size": 1,
+    "train_batch_size": 6,
     "warmup_steps": 0,
     "weight_decay": 0.0
   }
