@@ -60,12 +60,12 @@ BucketOps.download_folder(
     )
 
 #Read args from config file instead, use vars() to convert namespace to dict
-dataset = Dataset.get(dataset_name="muc4", dataset_project="datasets/muc4", dataset_tags=["17Fields","GTT","processed"], only_published=True)
+dataset = Dataset.get(dataset_name="muc4-processed-post-eda-v2", dataset_project="datasets/muc4", dataset_tags=["17Fields","GTT","processed"], only_completed=True)
 dataset_folder = dataset.get_local_copy()
 print(list(os.walk(dataset_folder)))
 
 # if os.path.exists(dataset_folder)==False:
-os.symlink(os.path.join(dataset_folder, "data/wikievents/muc_format"), args.data_dir)
+os.symlink(dataset_folder, args.data_dir)
 
 from transformer_base import BaseTransformer, add_generic_args, generic_train
 from utils_gtt import convert_examples_to_features, get_labels, read_examples_from_file, read_golds_from_test_file, not_sub_string, incident_token_to_type
