@@ -3,8 +3,10 @@ import argparse
 import json
 
 #Task.add_requirements('transformers', package_version='4.2.0')
+Task.add_requirements('-rrequirements.txt')
 task = Task.init(project_name='GTT', task_name='gtt-training', output_uri="s3://experiment-logging/storage/")
-task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
+# task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
+task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
 
 config = json.load(open('config.json'))
 args = argparse.Namespace(**config["default"])
