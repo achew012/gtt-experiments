@@ -3,14 +3,14 @@ import argparse
 import json
 
 #Task.add_requirements('transformers', package_version='4.2.0')
-task = Task.init(project_name='GTT', task_name='prediction', output_uri="s3://experiment-logging/storage/")
+task = Task.init(project_name='GTT', task_name='gtt-training', output_uri="s3://experiment-logging/storage/")
 task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
 
 config = json.load(open('config.json'))
 args = argparse.Namespace(**config["default"])
 task.connect(args)
 
-task.execute_remotely(queue_name="128RAMv100", exit_process=True)
+task.execute_remotely(queue_name="compute", exit_process=True)
 clearlogger = task.get_logger()
 
 import argparse
@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import jsonlines
 
 
-class bucket_ops:
+class BucketOps:
     StorageManager.set_cache_file_limit(5, cache_context=None)
 
     def list(remote_path:str):
@@ -51,13 +51,13 @@ class bucket_ops:
         StorageManager.upload_file(local_path, remote_path, wait_for_upload=True, retries=3)
 
 #Download Pretrained Models
-bucket_ops.download_folder(
+BucketOps.download_folder(
     local_path="/models/bert-base-uncased", 
     remote_path="s3://experiment-logging/pretrained/bert-base-uncased", 
     )
 
 #Read args from config file instead, use vars() to convert namespace to dict
-dataset = Dataset.get(dataset_name="wikievents-muc4", dataset_project="datasets/wikievents", dataset_tags=["muc4-format"], only_published=True)
+dataset = Dataset.get(dataset_name="muc4", dataset_project="datasets/muc4", dataset_tags=["17Fields","GTT","processed"], only_published=True)
 dataset_folder = dataset.get_local_copy()
 print(list(os.walk(dataset_folder)))
 
@@ -67,7 +67,25 @@ os.symlink(os.path.join(dataset_folder, "data/wikievents/muc_format"), args.data
 from transformer_base import BaseTransformer, add_generic_args, generic_train
 from utils_gtt import convert_examples_to_features, get_labels, read_examples_from_file, read_golds_from_test_file, not_sub_string, incident_token_to_type
 
-role_list = ["incident_type", "PerpInd", "PerpOrg", "Target", "Victim", "Weapon"]
+role_list = [
+    "Location",
+    "PerpInd",
+    "PerpOrg",
+    "PhysicalTarget",
+    "Weapon",
+    "HumTargetCivilian",
+    "HumTargetGovOfficial",
+    "HumTargetMilitary",
+    "HumTargetPoliticalFigure",
+    "HumTargetLegal",
+    "HumTargetOthers",
+    "KIASingle",
+    "KIAPlural",
+    "KIAMultiple",
+    "WIASingle",
+    "WIAPlural",
+    "WIAMultiple"
+    ]
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger(__name__)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -574,11 +592,11 @@ class NERTransformer(BaseTransformer):
 global_args = args
 
 if args.do_train ==False:
-    bucket_ops.download_folder(
+    BucketOps.download_folder(
         local_path="/models/", 
         remote_path="s3://experiment-logging/storage/GTT/fullGTT.bf5b1dafdc624f8b8ac90d2f1bf28a66/models/", 
         )
-    model = NERTransformer.load_from_checkpoint('/models/best-grit-model.ckpt')
+    model = NERTransformer.load_from_checkpoint('/models/best-gtt-model.ckpt')
 else:
     model = NERTransformer(args)
 
