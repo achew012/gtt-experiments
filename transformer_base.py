@@ -51,9 +51,10 @@ class BaseTransformer(pl.LightningModule):
         self.hparams.update(vars(params))
         self.hparams.model_type = self.hparams.model_type.lower()
 
+        print(self.hparams.model_name_or_path)
         config = AutoConfig.from_pretrained(self.hparams.model_name_or_path, max_position_embeddings=2048)
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.model_name_or_path)
-        model = MODEL_MODES[mode].from_pretrained(config)
+        model = MODEL_MODES[mode].from_pretrained(config=config)
 
         self.config, self.tokenizer, self.model = config, tokenizer, model
 
