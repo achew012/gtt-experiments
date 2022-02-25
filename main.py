@@ -65,10 +65,13 @@ dataset_folder = dataset.get_local_copy()
 print(list(os.walk(dataset_folder)))
 
 # if os.path.exists(dataset_folder)==False:
-os.symlink(dataset_folder, args.data_dir)
+#     os.symlink(dataset_folder, args.data_dir, target_is_directory=True)
 
 from transformer_base import BaseTransformer, add_generic_args, generic_train
-from utils_gtt import convert_examples_to_features, get_labels, read_examples_from_file, read_golds_from_test_file, not_sub_string, incident_token_to_type
+from utils_gtt import convert_examples_to_features, get_labels, read_examples_from_file, read_golds_from_test_file, not_sub_string
+
+global_data_path = "{}/data/muc/processed/".format(dataset_folder)
+incident_token_to_type = json.load(open(global_data_path+"template_dicts.json"))
 
 role_list = [
     "Location",
@@ -157,9 +160,10 @@ class NERTransformer(BaseTransformer):
         for mode in ["train", "dev", "test"]:
             cached_features_file = self._feature_file(mode)
             if not os.path.exists(cached_features_file):
-                logger.info("Creating features from dataset file at %s", args.data_dir)
-                examples = read_examples_from_file(args.data_dir, mode, self.tokenizer, debug=args.debug)
+                logger.info("Creating features from dataset file at %s", global_data_path)
+                examples = read_examples_from_file(global_data_path, mode, self.tokenizer, debug=args.debug)
                 features = convert_examples_to_features(
+                    incident_token_to_type,
                     examples,
                     # self.labels,
                     args.max_seq_length_src,
@@ -477,7 +481,7 @@ class NERTransformer(BaseTransformer):
 
         ## real decoding
         # read golds
-        doctexts_tokens, golds = read_golds_from_test_file(args.data_dir, self.tokenizer, debug=args.debug)
+        doctexts_tokens, golds = read_golds_from_test_file(global_data_path, self.tokenizer, debug=args.debug)
         # get preds and preds_log
         preds = OrderedDict()
         preds_log = OrderedDict()

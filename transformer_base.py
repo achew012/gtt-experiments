@@ -51,21 +51,9 @@ class BaseTransformer(pl.LightningModule):
         self.hparams.update(vars(params))
         self.hparams.model_type = self.hparams.model_type.lower()
 
-        config = AutoConfig.from_pretrained(
-            self.hparams.config_name if self.hparams.config_name else self.hparams.model_name_or_path,
-            cache_dir=None, force_download=False,
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            self.hparams.tokenizer_name if self.hparams.tokenizer_name else self.hparams.model_name_or_path,
-            do_lower_case=self.hparams.do_lower_case,
-            cache_dir=None, force_download=False,
-        )
-        model = MODEL_MODES[mode].from_pretrained(
-            self.hparams.model_name_or_path,
-            from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
-            config=config,
-            cache_dir=None, force_download=False,
-        )
+        config = AutoConfig.from_pretrained(self.hparams.model_name_or_path, max_position_embeddings=2048)
+        tokenizer = AutoTokenizer.from_pretrained(self.hparams.model_name_or_path)
+        model = MODEL_MODES[mode].from_pretrained(config)
 
         self.config, self.tokenizer, self.model = config, tokenizer, model
 
