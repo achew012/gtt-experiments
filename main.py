@@ -2,11 +2,8 @@ from clearml import Task, StorageManager, Dataset
 import argparse
 import json
 
-#Task.add_requirements('transformers', package_version='4.2.0')
-# Task.add_requirements('-rrequirements.txt')
 Task.force_requirements_env_freeze(force=True, requirements_file='requirements.txt')
 task = Task.init(project_name='GTT', task_name='train-gtt', output_uri="s3://experiment-logging/storage/")
-# task.set_base_docker("nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04")
 task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
 
 config = json.load(open('config.json'))
@@ -54,10 +51,10 @@ class BucketOps:
         StorageManager.upload_file(local_path, remote_path, wait_for_upload=True, retries=3)
 
 #Download Pretrained Models
-BucketOps.download_folder(
-    local_path="/models/bert-base-uncased", 
-    remote_path="s3://experiment-logging/pretrained/bert-base-uncased", 
-    )
+# BucketOps.download_folder(
+#     local_path="/models/bert-base-uncased", 
+#     remote_path="s3://experiment-logging/pretrained/bert-base-uncased", 
+#     )
 
 #Read args from config file instead, use vars() to convert namespace to dict
 dataset = Dataset.get(dataset_name="muc4-processed-post-eda-v2", dataset_project="datasets/muc4", dataset_tags=["17Fields","GTT","processed"], only_completed=True)
@@ -539,11 +536,11 @@ class NERTransformer(BaseTransformer):
         logger.info("writing preds to .out file:")
         if args.debug:
             task.upload_artifact('preds_debug', preds_log)
-            #with open("preds_gtt_debug.out", "w+") as f:
+            # with open("preds_gtt_debug.out", "w+") as f:
             #    f.write(json.dumps(preds_log, indent=4))            
         else:
             task.upload_artifact('preds', preds_log)
-            #with open("preds_gtt.out", "w+") as f:
+            # with open("preds_gtt.out", "w+") as f:
             #    f.write(json.dumps(preds_log, indent=4))
 
         # import ipdb; ipdb.set_trace()

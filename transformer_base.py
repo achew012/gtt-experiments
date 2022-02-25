@@ -44,17 +44,17 @@ def set_seed(args):
 
 
 class BaseTransformer(pl.LightningModule):
-    def __init__(self, params, num_labels=None, mode="base"):
+    def __init__(self, params, mode="base"):
         "Initialize a model."
 
         super(BaseTransformer, self).__init__()
-        self.hparams.update(vars(params))
+        self.hparams = params
+        # self.hparams.update(vars(params))
         self.hparams.model_type = self.hparams.model_type.lower()
 
-        print(self.hparams.model_name_or_path)
-        config = AutoConfig.from_pretrained(self.hparams.model_name_or_path, max_position_embeddings=2048)
+        config = AutoConfig.from_pretrained(self.hparams.model_name_or_path, max_position_embeddings=1024)
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.model_name_or_path)
-        model = MODEL_MODES[mode].from_pretrained(config=config)
+        model = MODEL_MODES[mode].from_config(config)
 
         self.config, self.tokenizer, self.model = config, tokenizer, model
 
@@ -266,8 +266,8 @@ def generic_train(model, args):
     #     raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
  
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        dirpath = "../outputs/",
-        filename="best-grit-model", 
+        filepath = "./",
+        # filename="best-gtt-model", 
         monitor="val_accuracy", 
         mode="max", 
         save_top_k=1, 

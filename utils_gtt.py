@@ -65,6 +65,8 @@ class InputFeatures(object):
 
 def find_sub_list(m_tokens, doctext_tokens):
     m_len = len(m_tokens)
+    # print(m_tokens)
+    # print(doctext_tokens)
     for idx in (i for i, t in enumerate(doctext_tokens) if t == m_tokens[0]):
         if doctext_tokens[idx: idx + m_len] == m_tokens:
             return idx, idx + m_len - 1
@@ -162,7 +164,10 @@ def read_examples_from_file(data_dir, mode, tokenizer, debug=False):
                         template[role] = []
                         for entity in value:
                             first_mention_tokens = tokenizer.tokenize(entity[0][0])
-                            start, end = find_sub_list(first_mention_tokens, doctext_tokens)
+                            if first_mention_tokens==[]:
+                                start, end = 0, 0
+                            else:
+                                start, end = find_sub_list(first_mention_tokens, doctext_tokens)
                             if start != -1 and end != -1:
                                 template[role].append([start, end])
                                 example_entity_cnt += 1
@@ -542,8 +547,6 @@ def convert_examples_to_features(
         tgt_tokens_ids = tokenizer.convert_tokens_to_ids(tgt_tokens)
         tgt_mask = [1 if mask_padding_with_zero else 0] * len(tgt_tokens_ids)
 
-        print("max_seq_length_tgt{}".format(max_seq_length_tgt))
-        print("tgt_tokens{}".format(len(tgt_tokens)))
         padding_length = max_seq_length_tgt - len(tgt_tokens)
         tgt_tokens_ids += [pad_token] * padding_length
         tgt_mask += [0 if mask_padding_with_zero else 1] * padding_length
@@ -574,8 +577,8 @@ def convert_examples_to_features(
         segment_ids = src_segment_ids + tgt_segment_ids
         position_ids = src_position_ids + tgt_position_ids
 
-        if len(input_ids) != 510:
-            import ipdb; ipdb.set_trace()
+        # if len(input_ids) != 510:
+        #     import ipdb; ipdb.set_trace()
 
         # import ipdb; ipdb.set_trace()
 
