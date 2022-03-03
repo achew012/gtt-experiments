@@ -349,6 +349,9 @@ class NERTransformer(BaseTransformer):
                     break
             pred_seq.append(self.tokenizer.convert_ids_to_tokens(out_input_id_list[:idx+1]))
 
+            #Elwin's decoder
+            
+
             # get pred_extract
             temps_extract = []
             buf_template = []
@@ -385,7 +388,7 @@ class NERTransformer(BaseTransformer):
                                 extract_tokens = self.tokenizer.convert_ids_to_tokens([src_input_id_list[s_e_pair[0]]])
                                 if len(extract_tokens) <= 20: 
                                     candidate_str = " ".join(extract_tokens).replace(" ##", "").replace(" - ", "-")
-                                    if sep_cnt != 5 or "bomb" not in candidate_str:
+                                    if sep_cnt != len(role_list):
                                         if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
                                             entitys.append([candidate_str])
                             # add all entitys of this role
@@ -411,7 +414,7 @@ class NERTransformer(BaseTransformer):
                                 if extract_tokens:
                                     if len(extract_tokens) <= 20: 
                                         candidate_str = " ".join(extract_tokens).replace(" ##", "").replace(" - ", "-")
-                                        if sep_cnt != 5 or "bomb" not in candidate_str:
+                                        if sep_cnt != len(role_list):
                                             if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
                                                 entitys.append([candidate_str])
                         p_extract.append(entitys)
@@ -426,48 +429,6 @@ class NERTransformer(BaseTransformer):
 
 
             pred_extract.append(temps_extract)
-            ### old ###
-            # sep_cnt = 0
-            # position_buf = []
-            # for idx, token_id in enumerate(out_input_id_list):
-            #     if token_id == self.SEP:
-            #         sep_cnt += 1
-            #         entitys = []
-            #         s_e_pair = []
-            #         for position in position_buf:
-            #             s_e_pair.append(position)
-            #             if len(s_e_pair) == 2:
-            #                 s, e = s_e_pair[0], s_e_pair[1]
-            #                 extract_ids = []
-            #                 for j in range(s, e+1): 
-            #                     extract_ids.append(src_input_id_list[j])
-            #                 extract_tokens = self.tokenizer.convert_ids_to_tokens(extract_ids)
-            #                 if extract_tokens:
-            #                     if len(extract_tokens) <= 20: 
-            #                         candidate_str = " ".join(extract_tokens).replace(" ##", "")
-            #                         if sep_cnt != 4 or "bomb" not in candidate_str:
-            #                             if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
-            #                                 entitys.append([candidate_str])
-            #                 s_e_pair = []
-            #         # extra s in s_e_pair
-            #         if s_e_pair:
-            #             extract_tokens = self.tokenizer.convert_ids_to_tokens([src_input_id_list[s_e_pair[0]]])
-            #             if len(extract_tokens) <= 20: 
-            #                 candidate_str = " ".join(extract_tokens).replace(" ##", "")
-            #                 if sep_cnt != 4 or "bomb" not in candidate_str:
-            #                     if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
-            #                         entitys.append([candidate_str])
-            #         # add all entitys of this role
-            #         p_extract.append(entitys)
-            #         # clean buffer
-            #         position_buf = []
-            #     else:
-            #         position_buf.append(out_position_id_list[idx])
-            #     if sep_cnt >= 5: break
-            ### old ###
-
-
-        # return {"test_loss": tmp_eval_loss.detach().cpu(), "pred_seq": pred_seq, "pred_extract": pred_extract, "logits": tmp_eval_logits, "target": out_label_ids, "docid": docids}
         return {"pred_seq": pred_seq, "pred_extract": pred_extract, "docid": docids}
 
 
@@ -495,7 +456,7 @@ class NERTransformer(BaseTransformer):
                         template_name = temp_raw[0][0][0]
                         
                         if self.hparams.wikievents:
-                            with open('{}/role_dicts.json'.format(self.hparams.data_dir)) as f:
+                            with open('{}role_dicts.json'.format(global_data_path)) as f:
                                 role_dict = json.load(f)
                             role_list = ['incident_type'] + role_dict[template_name]
 
