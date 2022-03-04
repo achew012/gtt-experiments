@@ -2,16 +2,16 @@ from clearml import Task, StorageManager, Dataset
 import argparse
 import json
 
-Task.force_requirements_env_freeze(force=True, requirements_file='requirements.txt')
-task = Task.init(project_name='GTT', task_name='train-gtt', output_uri="s3://experiment-logging/storage/")
-task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
+# Task.force_requirements_env_freeze(force=True, requirements_file='requirements.txt')
+# task = Task.init(project_name='GTT', task_name='test-gtt', output_uri="s3://experiment-logging/storage/")
+# task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
 
 config = json.load(open('config.json'))
 args = argparse.Namespace(**config["default"])
-task.connect(args)
+# task.connect(args)
 
-task.execute_remotely(queue_name="compute", exit_process=True)
-clearlogger = task.get_logger()
+# task.execute_remotely(queue_name="compute", exit_process=True)
+# clearlogger = task.get_logger()
 
 import argparse
 import glob
@@ -270,6 +270,7 @@ class NERTransformer(BaseTransformer):
             # print(tgt_position_ids) # debug
             outputs = self(**inputs)
             logits = outputs[0][0]
+            import ipdb; ipdb.set_trace()
 
             ## option 1: setting the decoding constraints (!!!)
             # # (constraint 1) on decoding offset (length and larger offset)
@@ -339,6 +340,7 @@ class NERTransformer(BaseTransformer):
             src_input_id_list = src_input_ids[b].detach().cpu().tolist()
             out_input_id_list = out_input_id[b].detach().cpu().tolist()
             out_position_id_list = out_position_id[b].detach().cpu().tolist()
+            print(out_input_id_list)
             if out_input_id_list[-1] != self.CLS:
                 out_input_id_list.append(self.CLS)
 
@@ -379,7 +381,7 @@ class NERTransformer(BaseTransformer):
                                     if extract_tokens:
                                         if len(extract_tokens) <= 20: 
                                             candidate_str = " ".join(extract_tokens).replace(" ##", "").replace(" - ", "-")
-                                            if sep_cnt != 5 or "bomb" not in candidate_str:
+                                            if sep_cnt != len(role_list):
                                                 if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
                                                     entitys.append([candidate_str])
                                     s_e_pair = []
@@ -397,7 +399,7 @@ class NERTransformer(BaseTransformer):
                             position_buf = []
                         else:
                             position_buf.append(buf_template_pos[temp_idx])
-                        if sep_cnt >= 6: break
+                        if sep_cnt >= len(role_list) + 1: break
 
                     # extra token1 token2 [unused0] (no final [SEP])
                     if position_buf:
@@ -429,6 +431,7 @@ class NERTransformer(BaseTransformer):
 
 
             pred_extract.append(temps_extract)
+        print(pred_seq)
         return {"pred_seq": pred_seq, "pred_extract": pred_extract, "docid": docids}
 
 
@@ -556,16 +559,15 @@ class NERTransformer(BaseTransformer):
 
 global_args = args
 
-if args.do_train ==False:
-    BucketOps.download_folder(
-        local_path="/models/", 
-        remote_path="s3://experiment-logging/storage/GTT/fullGTT.bf5b1dafdc624f8b8ac90d2f1bf28a66/models/", 
-        )
-    model = NERTransformer.load_from_checkpoint('/models/best-gtt-model.ckpt')
+print("Training? {}".format(args.do_train))
+
+if args.do_train==False:
+    trained_model_path = StorageManager.get_local_copy("s3://experiment-logging/storage/GTT/train-gtt.0f1637206d4347d5b85842fb47dd5b4b/models/epoch=31-step=41599.ckpt")
+    model = NERTransformer.load_from_checkpoint(trained_model_path)
 else:
     model = NERTransformer(args)
-
+    
 trainer = generic_train(model, args)
 result = trainer.test(model)
-task.upload_artifact("predictions", result)
-task.close()
+# task.upload_artifact("predictions", result)
+# task.close()
