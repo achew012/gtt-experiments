@@ -6,7 +6,7 @@ import json
 # task = Task.init(project_name='GTT', task_name='test-gtt', output_uri="s3://experiment-logging/storage/")
 # task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
 
-config = json.load(open('config.json'))
+config = json.load(open("config.json"))
 args = argparse.Namespace(**config["default"])
 # task.connect(args)
 
@@ -32,32 +32,42 @@ import jsonlines
 class BucketOps:
     StorageManager.set_cache_file_limit(5, cache_context=None)
 
-    def list(remote_path:str):
+    def list(remote_path: str):
         return StorageManager.list(remote_path, return_full_path=False)
 
-    def upload_folder(local_path:str, remote_path:str):
+    def upload_folder(local_path: str, remote_path: str):
         StorageManager.upload_folder(local_path, remote_path, match_wildcard=None)
         print("Uploaded {}".format(local_path))
 
-    def download_folder(local_path:str, remote_path:str):
-        StorageManager.download_folder(remote_path, local_path, match_wildcard=None, overwrite=True)
+    def download_folder(local_path: str, remote_path: str):
+        StorageManager.download_folder(
+            remote_path, local_path, match_wildcard=None, overwrite=True
+        )
         print("Downloaded {}".format(remote_path))
-    
-    def get_file(remote_path:str):        
+
+    def get_file(remote_path: str):
         object = StorageManager.get_local_copy(remote_path)
         return object
 
-    def upload_file(local_path:str, remote_path:str):
-        StorageManager.upload_file(local_path, remote_path, wait_for_upload=True, retries=3)
+    def upload_file(local_path: str, remote_path: str):
+        StorageManager.upload_file(
+            local_path, remote_path, wait_for_upload=True, retries=3
+        )
 
-#Download Pretrained Models
+
+# Download Pretrained Models
 # BucketOps.download_folder(
-#     local_path="/models/bert-base-uncased", 
-#     remote_path="s3://experiment-logging/pretrained/bert-base-uncased", 
+#     local_path="/models/bert-base-uncased",
+#     remote_path="s3://experiment-logging/pretrained/bert-base-uncased",
 #     )
 
-#Read args from config file instead, use vars() to convert namespace to dict
-dataset = Dataset.get(dataset_name="muc4-processed-post-eda-v2", dataset_project="datasets/muc4", dataset_tags=["17Fields","GTT","processed"], only_completed=True)
+# Read args from config file instead, use vars() to convert namespace to dict
+dataset = Dataset.get(
+    dataset_name="muc4-processed-post-eda-v2",
+    dataset_project="datasets/muc4",
+    dataset_tags=["17Fields", "GTT", "processed"],
+    only_completed=True,
+)
 dataset_folder = dataset.get_local_copy()
 print(list(os.walk(dataset_folder)))
 
@@ -65,10 +75,16 @@ print(list(os.walk(dataset_folder)))
 #     os.symlink(dataset_folder, args.data_dir, target_is_directory=True)
 
 from transformer_base import BaseTransformer, add_generic_args, generic_train
-from utils_gtt import convert_examples_to_features, get_labels, read_examples_from_file, read_golds_from_test_file, not_sub_string
+from utils_gtt import (
+    convert_examples_to_features,
+    get_labels,
+    read_examples_from_file,
+    read_golds_from_test_file,
+    not_sub_string,
+)
 
 global_data_path = "{}/data/muc/processed/".format(dataset_folder)
-incident_token_to_type = json.load(open(global_data_path+"template_dicts.json"))
+incident_token_to_type = json.load(open(global_data_path + "template_dicts.json"))
 
 role_list = [
     "Location",
@@ -87,57 +103,75 @@ role_list = [
     "KIAMultiple",
     "WIASingle",
     "WIAPlural",
-    "WIAMultiple"
-    ]
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s', datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
+    "WIAMultiple",
+]
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
+)
 logger = logging.getLogger(__name__)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def to_jsonl(filename:str, file_obj):
-    resultfile = open(filename, 'wb')
+def to_jsonl(filename: str, file_obj):
+    resultfile = open(filename, "wb")
     writer = jsonlines.Writer(resultfile)
     writer.write_all(file_obj)
+
 
 class NERTransformer(BaseTransformer):
     """
     A training module for single-transformer-ee. See BaseTransformer for the core options.
     """
+
     mode = "base"
 
     def __init__(self, hparams):
         self.pad_token_label_id = CrossEntropyLoss().ignore_index
         # self.device = device
-        # super(NERTransformer, self).__init__(hparams, num_labels, self.mode)        
+        # super(NERTransformer, self).__init__(hparams, num_labels, self.mode)
 
         super(NERTransformer, self).__init__(hparams, self.mode)
         # n_gpu = torch.cuda.device_count()
         # self.MASK = tokenizer.convert_tokens_to_ids(['[MASK]'])[0]
-        self.SEP = self.tokenizer.convert_tokens_to_ids(['[SEP]'])[0]
-        self.CLS = self.tokenizer.convert_tokens_to_ids(['[CLS]'])[0]   
+        self.SEP = self.tokenizer.convert_tokens_to_ids(["[SEP]"])[0]
+        self.CLS = self.tokenizer.convert_tokens_to_ids(["[CLS]"])[0]
         self.SEP_template = self.tokenizer.convert_tokens_to_ids(["[unused0]"])[0]
 
     def forward(self, **inputs):
-        labels = inputs.pop("labels", None) # doc_length
+        labels = inputs.pop("labels", None)  # doc_length
         args = self.hparams
 
-        outputs = self.model(**inputs) # sequence_output, pooled_output, (hidden_states), (attentions)
+        outputs = self.model(
+            **inputs
+        )  # sequence_output, pooled_output, (hidden_states), (attentions)
         sequence_output = outputs[0]
-        src_sequence_output = sequence_output[:, :args.max_seq_length_src, :]
-        src_sequence_output = torch.transpose(src_sequence_output, 1, 2) # hidden * doc_length
-        tgt_sequence_output = sequence_output[:, args.max_seq_length_src:, :]  # tgt_length * hidden
-        logits = torch.bmm(tgt_sequence_output, src_sequence_output) # tgt_length * doc_length
+        src_sequence_output = sequence_output[:, : args.max_seq_length_src, :]
+        src_sequence_output = torch.transpose(
+            src_sequence_output, 1, 2
+        )  # hidden * doc_length
+        tgt_sequence_output = sequence_output[
+            :, args.max_seq_length_src :, :
+        ]  # tgt_length * hidden
+        logits = torch.bmm(
+            tgt_sequence_output, src_sequence_output
+        )  # tgt_length * doc_length
 
         outputs = (logits,) + outputs[2:]
         if labels is not None:
             loss_fct = CrossEntropyLoss()
-            tgt_attention_mask_1d = inputs["attention_mask"][:, -1, args.max_seq_length_src:]
+            tgt_attention_mask_1d = inputs["attention_mask"][
+                :, -1, args.max_seq_length_src :
+            ]
             if tgt_attention_mask_1d is not None:
                 active_logits = logits.view(-1, args.max_seq_length_src)
                 active_labels = labels.view(-1)
                 loss = loss_fct(active_logits, active_labels)
             else:
-                loss = loss_fct(logits.view(-1, args.max_seq_length_src), labels.view(-1))
+                loss = loss_fct(
+                    logits.view(-1, args.max_seq_length_src), labels.view(-1)
+                )
             outputs = (loss,) + outputs
 
         # import ipdb; ipdb.set_trace()
@@ -145,10 +179,19 @@ class NERTransformer(BaseTransformer):
 
     def training_step(self, batch, batch_num):
         "Compute loss and log."
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2], "position_ids": batch[3], "labels": batch[4]}
+        inputs = {
+            "input_ids": batch[0],
+            "attention_mask": batch[1],
+            "token_type_ids": batch[2],
+            "position_ids": batch[3],
+            "labels": batch[4],
+        }
         outputs = self(**inputs)
         loss = outputs[0]
-        tensorboard_logs = {"training_loss": loss, "rate": self.lr_scheduler.get_last_lr()[-1]}
+        tensorboard_logs = {
+            "training_loss": loss,
+            "rate": self.lr_scheduler.get_last_lr()[-1],
+        }
         return {"loss": loss, "log": tensorboard_logs}
 
     def prepare_data(self):
@@ -157,8 +200,12 @@ class NERTransformer(BaseTransformer):
         for mode in ["train", "dev", "test"]:
             cached_features_file = self._feature_file(mode)
             if not os.path.exists(cached_features_file):
-                logger.info("Creating features from dataset file at %s", global_data_path)
-                examples = read_examples_from_file(global_data_path, mode, self.tokenizer, debug=args.debug)
+                logger.info(
+                    "Creating features from dataset file at %s", global_data_path
+                )
+                examples = read_examples_from_file(
+                    global_data_path, mode, self.tokenizer, debug=args.debug
+                )
                 features = convert_examples_to_features(
                     incident_token_to_type,
                     examples,
@@ -172,7 +219,9 @@ class NERTransformer(BaseTransformer):
                     sep_token=self.tokenizer.sep_token,
                     sep_token_extra=bool(args.model_type in ["roberta"]),
                     pad_on_left=bool(args.model_type in ["xlnet"]),
-                    pad_token=self.tokenizer.convert_tokens_to_ids([self.tokenizer.pad_token])[0],
+                    pad_token=self.tokenizer.convert_tokens_to_ids(
+                        [self.tokenizer.pad_token]
+                    )[0],
                     pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
                     pad_token_label_id=self.pad_token_label_id,
                 )
@@ -190,25 +239,49 @@ class NERTransformer(BaseTransformer):
             features = features[:2]
             # features = features[:len(features)//10]
         all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
-        all_position_ids = torch.tensor([f.position_ids for f in features], dtype=torch.long)
+        all_input_mask = torch.tensor(
+            [f.input_mask for f in features], dtype=torch.long
+        )
+        all_segment_ids = torch.tensor(
+            [f.segment_ids for f in features], dtype=torch.long
+        )
+        all_position_ids = torch.tensor(
+            [f.position_ids for f in features], dtype=torch.long
+        )
         all_label_ids = torch.tensor([f.label_ids for f in features], dtype=torch.long)
         all_docid = torch.tensor([f.docid for f in features], dtype=torch.long)
         return DataLoader(
-            TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_position_ids, all_label_ids, all_docid), batch_size=batch_size
+            TensorDataset(
+                all_input_ids,
+                all_input_mask,
+                all_segment_ids,
+                all_position_ids,
+                all_label_ids,
+                all_docid,
+            ),
+            batch_size=batch_size,
         )
 
     def validation_step(self, batch, batch_nb):
         "Compute validation"
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2], "position_ids": batch[3], "labels": batch[4]}
+        inputs = {
+            "input_ids": batch[0],
+            "attention_mask": batch[1],
+            "token_type_ids": batch[2],
+            "position_ids": batch[3],
+            "labels": batch[4],
+        }
         outputs = self(**inputs)
         tmp_eval_loss, logits = outputs[:2]
         preds = logits.detach().cpu().numpy()
         out_label_ids = inputs["labels"].detach().cpu().numpy()
         docid = batch[5].detach().cpu().numpy()
-        return {"val_loss": tmp_eval_loss.detach().cpu(), "pred": preds, "target": out_label_ids, "docid": docid}
-
+        return {
+            "val_loss": tmp_eval_loss.detach().cpu(),
+            "pred": preds,
+            "target": out_label_ids,
+            "docid": docid,
+        }
 
     def validation_epoch_end(self, outputs):
         val_loss_mean = torch.stack([x["val_loss"] for x in outputs]).mean()
@@ -228,10 +301,9 @@ class NERTransformer(BaseTransformer):
 
         logs = {
             "val_loss": val_loss_mean,
-            "val_accuracy": accuracy_score(out_label_list, preds_list)
+            "val_accuracy": accuracy_score(out_label_list, preds_list),
         }
         return {"val_loss": logs["val_loss"], "log": logs, "progress_bar": logs}
-
 
     def test_step(self, batch, batch_nb):
         "Compute test"
@@ -250,8 +322,12 @@ class NERTransformer(BaseTransformer):
         i = max_seq_length_src
         src_input_ids = batch[0][:, :max_seq_length_src]
         src_position_ids = batch[3][:, :max_seq_length_src]
-        tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]).to(device), torch.tensor([[self.CLS]]).to(device)
-        tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]).to(device), torch.tensor([[0]]).to(device)
+        tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]).to(
+            device
+        ), torch.tensor([[self.CLS]]).to(device)
+        tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]).to(
+            device
+        ), torch.tensor([[0]]).to(device)
 
         # tgt_input_ids, init_tgt_input_ids = torch.tensor([[self.CLS]]), torch.tensor([[self.CLS]])
         # tgt_position_ids, init_tgt_position_ids = torch.tensor([[0]]), torch.tensor([[0]])
@@ -259,26 +335,33 @@ class NERTransformer(BaseTransformer):
         # get out_input_id_list (pred_seq)
         while i <= max_seq_length_src + max_seq_length_tgt - 1:
             input_ids = torch.cat((src_input_ids, tgt_input_ids), dim=1)
-            attention_mask = batch[1][:, :i+1, :i+1]
-            for j in range(max_seq_length_src, i+1):
-                attention_mask[:, j, max_seq_length_src:j+1] = 1
+            attention_mask = batch[1][:, : i + 1, : i + 1]
+            for j in range(max_seq_length_src, i + 1):
+                attention_mask[:, j, max_seq_length_src : j + 1] = 1
             # if i == max_seq_length_src + 3: # debug
-                # import ipdb; ipdb.set_trace()
-            token_type_ids = batch[2][:, :i+1]
+            # import ipdb; ipdb.set_trace()
+            token_type_ids = batch[2][:, : i + 1]
             position_ids = torch.cat((src_position_ids, tgt_position_ids), dim=1)
-            inputs = {"input_ids": input_ids, "attention_mask": attention_mask, "token_type_ids": token_type_ids, "position_ids": position_ids}
+            inputs = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "token_type_ids": token_type_ids,
+                "position_ids": position_ids,
+            }
             # print(tgt_position_ids) # debug
             outputs = self(**inputs)
             logits = outputs[0][0]
-            import ipdb; ipdb.set_trace()
+            import ipdb
+
+            ipdb.set_trace()
 
             ## option 1: setting the decoding constraints (!!!)
             # # (constraint 1) on decoding offset (length and larger offset)
             # for j in range(tgt_position_ids.size(1)):
             #     if j == 0: continue
             #     cur_token_id = tgt_input_ids[0][j].detach().cpu().tolist()
-            #     cur_token_position = tgt_position_ids[0][j].detach().cpu().tolist()              
-            #     if cur_token_id == self.CLS or cur_token_id == self.SEP or cur_token_id == self.SEP_template: 
+            #     cur_token_position = tgt_position_ids[0][j].detach().cpu().tolist()
+            #     if cur_token_id == self.CLS or cur_token_id == self.SEP or cur_token_id == self.SEP_template:
             #         continue
             #     else:
             #         # remove (early stop/output [SEP]) the case like ``the post post post post ...''
@@ -294,7 +377,7 @@ class NERTransformer(BaseTransformer):
 
             #     before_mask = cur_token_position
             #     for k in range(before_mask):
-            #         if src_input_ids[0][k].detach().cpu().tolist() == self.SEP: 
+            #         if src_input_ids[0][k].detach().cpu().tolist() == self.SEP:
             #             continue
             #         logits[j][k] -= 10000.0
             #     # for k in range(cur_token_position + 30, max_seq_length_src):
@@ -305,20 +388,31 @@ class NERTransformer(BaseTransformer):
             probs = torch.nn.Softmax(dim=-1)(logits)
             top_2_probs, top_2_indices = torch.topk(probs, 2, dim=-1)
             for j in range(top_2_indices.size(0)):
-                prob_gap = (top_2_probs[j][0]/top_2_probs[j][1]).detach().cpu().tolist()
-                if src_input_ids[0][top_2_indices[j][0].detach().cpu().tolist()].detach().cpu().tolist() == self.SEP and prob_gap < global_args.thresh:
+                prob_gap = (
+                    (top_2_probs[j][0] / top_2_probs[j][1]).detach().cpu().tolist()
+                )
+                if (
+                    src_input_ids[0][top_2_indices[j][0].detach().cpu().tolist()]
+                    .detach()
+                    .cpu()
+                    .tolist()
+                    == self.SEP
+                    and prob_gap < global_args.thresh
+                ):
                     top_2_indices[j][0] = top_2_indices[j][1]
 
             out_position_id = top_2_indices[:, 0]
 
             # # option 2: direct greedy decoding
             # out_position_id = torch.argmax(logits, -1)
-            
+
             # print(out_position_id) # debug
             out_input_id = torch.index_select(src_input_ids, 1, out_position_id)
-            out_position_id = out_position_id.unsqueeze(dim=0) # add batch dim
+            out_position_id = out_position_id.unsqueeze(dim=0)  # add batch dim
             tgt_input_ids = torch.cat((init_tgt_input_ids, out_input_id), dim=1)
-            tgt_position_ids = torch.cat((init_tgt_position_ids, out_position_id), dim=1)
+            tgt_position_ids = torch.cat(
+                (init_tgt_position_ids, out_position_id), dim=1
+            )
             i += 1
 
         # #########save prob logits
@@ -336,7 +430,7 @@ class NERTransformer(BaseTransformer):
         docids = batch[5].detach().cpu().tolist()
         pred_seq = []
         pred_extract = []
-        for b in range(bs): # bs == 1
+        for b in range(bs):  # bs == 1
             src_input_id_list = src_input_ids[b].detach().cpu().tolist()
             out_input_id_list = out_input_id[b].detach().cpu().tolist()
             out_position_id_list = out_position_id[b].detach().cpu().tolist()
@@ -349,10 +443,11 @@ class NERTransformer(BaseTransformer):
             for idx, token_id in enumerate(out_input_id_list):
                 if token_id == self.CLS:
                     break
-            pred_seq.append(self.tokenizer.convert_ids_to_tokens(out_input_id_list[:idx+1]))
+            pred_seq.append(
+                self.tokenizer.convert_ids_to_tokens(out_input_id_list[: idx + 1])
+            )
 
-            #Elwin's decoder
-            
+            # Elwin's decoder
 
             # get pred_extract
             temps_extract = []
@@ -375,23 +470,47 @@ class NERTransformer(BaseTransformer):
                                 if len(s_e_pair) == 2:
                                     s, e = s_e_pair[0], s_e_pair[1]
                                     extract_ids = []
-                                    for j in range(s, e+1): 
+                                    for j in range(s, e + 1):
                                         extract_ids.append(src_input_id_list[j])
-                                    extract_tokens = self.tokenizer.convert_ids_to_tokens(extract_ids)
+                                    extract_tokens = (
+                                        self.tokenizer.convert_ids_to_tokens(
+                                            extract_ids
+                                        )
+                                    )
                                     if extract_tokens:
-                                        if len(extract_tokens) <= 20: 
-                                            candidate_str = " ".join(extract_tokens).replace(" ##", "").replace(" - ", "-")
+                                        if len(extract_tokens) <= 20:
+                                            candidate_str = (
+                                                " ".join(extract_tokens)
+                                                .replace(" ##", "")
+                                                .replace(" - ", "-")
+                                            )
                                             if sep_cnt != len(role_list):
-                                                if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
+                                                if (
+                                                    [candidate_str] not in entitys
+                                                    and not_sub_string(
+                                                        candidate_str, entitys
+                                                    )
+                                                    and candidate_str[:2] != "##"
+                                                ):
                                                     entitys.append([candidate_str])
                                     s_e_pair = []
                             # extra s in s_e_pair
                             if s_e_pair:
-                                extract_tokens = self.tokenizer.convert_ids_to_tokens([src_input_id_list[s_e_pair[0]]])
-                                if len(extract_tokens) <= 20: 
-                                    candidate_str = " ".join(extract_tokens).replace(" ##", "").replace(" - ", "-")
+                                extract_tokens = self.tokenizer.convert_ids_to_tokens(
+                                    [src_input_id_list[s_e_pair[0]]]
+                                )
+                                if len(extract_tokens) <= 20:
+                                    candidate_str = (
+                                        " ".join(extract_tokens)
+                                        .replace(" ##", "")
+                                        .replace(" - ", "-")
+                                    )
                                     if sep_cnt != len(role_list):
-                                        if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
+                                        if (
+                                            [candidate_str] not in entitys
+                                            and not_sub_string(candidate_str, entitys)
+                                            and candidate_str[:2] != "##"
+                                        ):
                                             entitys.append([candidate_str])
                             # add all entitys of this role
                             p_extract.append(entitys)
@@ -399,7 +518,8 @@ class NERTransformer(BaseTransformer):
                             position_buf = []
                         else:
                             position_buf.append(buf_template_pos[temp_idx])
-                        if sep_cnt >= len(role_list) + 1: break
+                        if sep_cnt >= len(role_list) + 1:
+                            break
 
                     # extra token1 token2 [unused0] (no final [SEP])
                     if position_buf:
@@ -410,14 +530,26 @@ class NERTransformer(BaseTransformer):
                             if len(s_e_pair) == 2:
                                 s, e = s_e_pair[0], s_e_pair[1]
                                 extract_ids = []
-                                for j in range(s, e+1): 
+                                for j in range(s, e + 1):
                                     extract_ids.append(src_input_id_list[j])
-                                extract_tokens = self.tokenizer.convert_ids_to_tokens(extract_ids)
+                                extract_tokens = self.tokenizer.convert_ids_to_tokens(
+                                    extract_ids
+                                )
                                 if extract_tokens:
-                                    if len(extract_tokens) <= 20: 
-                                        candidate_str = " ".join(extract_tokens).replace(" ##", "").replace(" - ", "-")
+                                    if len(extract_tokens) <= 20:
+                                        candidate_str = (
+                                            " ".join(extract_tokens)
+                                            .replace(" ##", "")
+                                            .replace(" - ", "-")
+                                        )
                                         if sep_cnt != len(role_list):
-                                            if [candidate_str] not in entitys and not_sub_string(candidate_str, entitys) and candidate_str[:2] != "##":
+                                            if (
+                                                [candidate_str] not in entitys
+                                                and not_sub_string(
+                                                    candidate_str, entitys
+                                                )
+                                                and candidate_str[:2] != "##"
+                                            ):
                                                 entitys.append([candidate_str])
                         p_extract.append(entitys)
 
@@ -429,11 +561,9 @@ class NERTransformer(BaseTransformer):
                     buf_template.append(out_input_id_list[idx])
                     buf_template_pos.append(out_position_id_list[idx])
 
-
             pred_extract.append(temps_extract)
         print(pred_seq)
         return {"pred_seq": pred_seq, "pred_extract": pred_extract, "docid": docids}
-
 
     def test_epoch_end(self, outputs):
         # # updating to test_epoch_end instead of deprecated test_end
@@ -442,7 +572,9 @@ class NERTransformer(BaseTransformer):
 
         ## real decoding
         # read golds
-        doctexts_tokens, golds = read_golds_from_test_file(global_data_path, self.tokenizer, debug=args.debug)
+        doctexts_tokens, golds = read_golds_from_test_file(
+            global_data_path, self.tokenizer, debug=args.debug
+        )
         # get preds and preds_log
         preds = OrderedDict()
         preds_log = OrderedDict()
@@ -457,20 +589,24 @@ class NERTransformer(BaseTransformer):
                     for temp_raw in temps_extract:
                         temp = OrderedDict()
                         template_name = temp_raw[0][0][0]
-                        
+
                         if self.hparams.wikievents:
-                            with open('{}role_dicts.json'.format(global_data_path)) as f:
+                            with open(
+                                "{}role_dicts.json".format(global_data_path)
+                            ) as f:
                                 role_dict = json.load(f)
-                            role_list = ['incident_type'] + role_dict[template_name]
+                            role_list = ["incident_type"] + role_dict[template_name]
 
                         for idx, role in enumerate(role_list):
                             temp[role] = []
-                            if idx+1 > len(temp_raw):
+                            if idx + 1 > len(temp_raw):
                                 continue
                             elif temp_raw[idx]:
                                 if role == "incident_type":
                                     if temp_raw[idx][0][0] in incident_token_to_type:
-                                        temp[role] = incident_token_to_type[temp_raw[idx][0][0]]
+                                        temp[role] = incident_token_to_type[
+                                            temp_raw[idx][0][0]
+                                        ]
                                     else:
                                         temp[role] = temp_raw[idx][0][0]
                                 else:
@@ -478,7 +614,6 @@ class NERTransformer(BaseTransformer):
 
                         preds[docid].append(temp)
 
-                            
             # preds_log
             for docid, p_seq in zip(docids, pred_seq):
                 if docid not in preds_log:
@@ -499,17 +634,17 @@ class NERTransformer(BaseTransformer):
 
         logger.info("writing preds to .out file:")
         if args.debug:
-            task.upload_artifact('preds_debug', preds_log)
+            task.upload_artifact("preds_debug", preds_log)
             # with open("preds_gtt_debug.out", "w+") as f:
-            #    f.write(json.dumps(preds_log, indent=4))            
+            #    f.write(json.dumps(preds_log, indent=4))
         else:
-            task.upload_artifact('preds', preds_log)
+            task.upload_artifact("preds", preds_log)
             # with open("preds_gtt.out", "w+") as f:
             #    f.write(json.dumps(preds_log, indent=4))
 
         # import ipdb; ipdb.set_trace()
 
-        return {"log": logs, "progress_bar": logs, 'preds': preds_log}
+        return {"log": logs, "progress_bar": logs, "preds": preds_log}
         # return {"test_loss": logs["test_loss"], "log": logs, "progress_bar": logs}
 
     @staticmethod
@@ -548,12 +683,19 @@ class NERTransformer(BaseTransformer):
         )
 
         parser.add_argument(
-            "--overwrite_cache", action="store_true", help="Overwrite the cached training and evaluation sets"
+            "--overwrite_cache",
+            action="store_true",
+            help="Overwrite the cached training and evaluation sets",
         )
 
         parser.add_argument("--debug", action="store_true", help="if in debug mode")
 
-        parser.add_argument("--thresh", default=1, type=float, help="thresh for predicting [SEP]",)
+        parser.add_argument(
+            "--thresh",
+            default=1,
+            type=float,
+            help="thresh for predicting [SEP]",
+        )
         return parser
 
 
@@ -561,12 +703,12 @@ global_args = args
 
 print("Training? {}".format(args.do_train))
 
-if args.do_train==False:
-    trained_model_path = StorageManager.get_local_copy("s3://experiment-logging/storage/GTT/train-gtt.0f1637206d4347d5b85842fb47dd5b4b/models/epoch=31-step=41599.ckpt")
+if args.do_train == "False":
+    trained_model_path = StorageManager.get_local_copy(args.pretrained_path)
     model = NERTransformer.load_from_checkpoint(trained_model_path)
 else:
     model = NERTransformer(args)
-    
+
 trainer = generic_train(model, args)
 result = trainer.test(model)
 # task.upload_artifact("predictions", result)
