@@ -1,0 +1,7 @@
+data/
+lightning_logs/
+cached_dev_gtt_bert-base-uncased_300
+cached_train_gtt_bert-base-uncased_300
+cached_testcached_dev_gtt_bert-base-uncased_300
+_gtt_bert-base-uncased_300
+

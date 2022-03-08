@@ -2,16 +2,16 @@ from clearml import Task, StorageManager, Dataset
 import argparse
 import json
 
-# Task.force_requirements_env_freeze(force=True, requirements_file='requirements.txt')
-# task = Task.init(project_name='GTT', task_name='test-gtt', output_uri="s3://experiment-logging/storage/")
-# task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
+Task.force_requirements_env_freeze(force=True, requirements_file='requirements.txt')
+task = Task.init(project_name='GTT', task_name='test-gtt', output_uri="s3://experiment-logging/storage/")
+task.set_base_docker("nvcr.io/nvidia/pytorch:20.08-py3")
 
 config = json.load(open("config.json"))
 args = argparse.Namespace(**config["default"])
-# task.connect(args)
+task.connect(args)
 
-# task.execute_remotely(queue_name="compute", exit_process=True)
-# clearlogger = task.get_logger()
+task.execute_remotely(queue_name="compute", exit_process=True)
+clearlogger = task.get_logger()
 
 import argparse
 import glob
@@ -27,6 +27,7 @@ from seqeval.metrics import f1_score, precision_score, recall_score, accuracy_sc
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, TensorDataset
 import jsonlines
+import itertools
 
 
 class BucketOps:
@@ -194,47 +195,114 @@ class NERTransformer(BaseTransformer):
         }
         return {"loss": loss, "log": tensorboard_logs}
 
+    # def prepare_data(self):
+    #     "Called to initialize data. Use the call to construct features"
+    #     args = self.hparams
+    #     for mode in ["train", "dev", "test"]:
+    #         cached_features_file = self._feature_file(mode)
+    #         if not os.path.exists(cached_features_file):
+    #             logger.info(
+    #                 "Creating features from dataset file at %s", global_data_path
+    #             )
+    #             examples = read_examples_from_file(
+    #                 global_data_path, mode, self.tokenizer, debug=args.debug
+    #             )
+    #             features = convert_examples_to_features(
+    #                 incident_token_to_type,
+    #                 examples,
+    #                 # self.labels,
+    #                 args.max_seq_length_src,
+    #                 args.max_seq_length_tgt,
+    #                 self.tokenizer,
+    #                 cls_token_at_end=bool(args.model_type in ["xlnet"]),
+    #                 cls_token=self.tokenizer.cls_token,
+    #                 cls_token_segment_id=2 if args.model_type in ["xlnet"] else 0,
+    #                 sep_token=self.tokenizer.sep_token,
+    #                 sep_token_extra=bool(args.model_type in ["roberta"]),
+    #                 pad_on_left=bool(args.model_type in ["xlnet"]),
+    #                 pad_token=self.tokenizer.convert_tokens_to_ids(
+    #                     [self.tokenizer.pad_token]
+    #                 )[0],
+    #                 pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
+    #                 pad_token_label_id=self.pad_token_label_id,
+    #             )
+    #             logger.info("Saving features into cached file %s", cached_features_file)
+    #             torch.save(features, cached_features_file)
+
     def prepare_data(self):
         "Called to initialize data. Use the call to construct features"
         args = self.hparams
+        splits = []
         for mode in ["train", "dev", "test"]:
-            cached_features_file = self._feature_file(mode)
-            if not os.path.exists(cached_features_file):
-                logger.info(
-                    "Creating features from dataset file at %s", global_data_path
-                )
-                examples = read_examples_from_file(
-                    global_data_path, mode, self.tokenizer, debug=args.debug
-                )
-                features = convert_examples_to_features(
-                    incident_token_to_type,
-                    examples,
-                    # self.labels,
-                    args.max_seq_length_src,
-                    args.max_seq_length_tgt,
-                    self.tokenizer,
-                    cls_token_at_end=bool(args.model_type in ["xlnet"]),
-                    cls_token=self.tokenizer.cls_token,
-                    cls_token_segment_id=2 if args.model_type in ["xlnet"] else 0,
-                    sep_token=self.tokenizer.sep_token,
-                    sep_token_extra=bool(args.model_type in ["roberta"]),
-                    pad_on_left=bool(args.model_type in ["xlnet"]),
-                    pad_token=self.tokenizer.convert_tokens_to_ids(
-                        [self.tokenizer.pad_token]
-                    )[0],
-                    pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
-                    pad_token_label_id=self.pad_token_label_id,
-                )
-                logger.info("Saving features into cached file %s", cached_features_file)
-                torch.save(features, cached_features_file)
+            examples = read_examples_from_file(
+                global_data_path, mode, self.tokenizer, debug=args.debug
+            )
+            features = convert_examples_to_features(
+                incident_token_to_type,
+                examples,
+                # self.labels,
+                args.max_seq_length_src,
+                args.max_seq_length_tgt,
+                self.tokenizer,
+                cls_token_at_end=bool(args.model_type in ["xlnet"]),
+                cls_token=self.tokenizer.cls_token,
+                cls_token_segment_id=2 if args.model_type in ["xlnet"] else 0,
+                sep_token=self.tokenizer.sep_token,
+                sep_token_extra=bool(args.model_type in ["roberta"]),
+                pad_on_left=bool(args.model_type in ["xlnet"]),
+                pad_token=self.tokenizer.convert_tokens_to_ids(
+                    [self.tokenizer.pad_token]
+                )[0],
+                pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
+                pad_token_label_id=self.pad_token_label_id,
+            )
+            splits.append(features)
+        return splits
         # import ipdb; ipdb.set_trace()
+
+    # def load_dataset(self, mode, batch_size):
+    #     "Load datasets. Called after prepare data."
+    #     args = self.hparams
+    #     cached_features_file = self._feature_file(mode)
+    #     logger.info("Loading features from cached file %s", cached_features_file)
+    #     features = torch.load(cached_features_file)
+    #     if args.debug:
+    #         features = features[:2]
+    #         # features = features[:len(features)//10]
+    #     all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+    #     all_input_mask = torch.tensor(
+    #         [f.input_mask for f in features], dtype=torch.long
+    #     )
+    #     all_segment_ids = torch.tensor(
+    #         [f.segment_ids for f in features], dtype=torch.long
+    #     )
+    #     all_position_ids = torch.tensor(
+    #         [f.position_ids for f in features], dtype=torch.long
+    #     )
+    #     all_label_ids = torch.tensor([f.label_ids for f in features], dtype=torch.long)
+    #     all_docid = torch.tensor([f.docid for f in features], dtype=torch.long)
+    #     return DataLoader(
+    #         TensorDataset(
+    #             all_input_ids,
+    #             all_input_mask,
+    #             all_segment_ids,
+    #             all_position_ids,
+    #             all_label_ids,
+    #             all_docid,
+    #         ),
+    #         batch_size=batch_size,
+    #     )
 
     def load_dataset(self, mode, batch_size):
         "Load datasets. Called after prepare data."
         args = self.hparams
-        cached_features_file = self._feature_file(mode)
-        logger.info("Loading features from cached file %s", cached_features_file)
-        features = torch.load(cached_features_file)
+        splits = self.prepare_data()
+        if mode=="train":
+            features = splits[0]
+        elif mode=="dev":
+            features = splits[1]
+        else:
+            features = splits[2]
         if args.debug:
             features = features[:2]
             # features = features[:len(features)//10]
@@ -351,9 +419,6 @@ class NERTransformer(BaseTransformer):
             # print(tgt_position_ids) # debug
             outputs = self(**inputs)
             logits = outputs[0][0]
-            import ipdb
-
-            ipdb.set_trace()
 
             ## option 1: setting the decoding constraints (!!!)
             # # (constraint 1) on decoding offset (length and larger offset)
@@ -453,7 +518,10 @@ class NERTransformer(BaseTransformer):
             temps_extract = []
             buf_template = []
             buf_template_pos = []
-            for idx, token_id in enumerate(out_input_id_list[:idx]):
+            out_input_id_list_mod = out_input_id_list[:idx]
+            if len(out_input_id_list_mod)>1:
+                out_input_id_list_mod[-1] = self.SEP_template
+            for idx, token_id in enumerate(out_input_id_list_mod):
                 if token_id == self.SEP_template:
                     # decode one template's content
                     # incident_token_to_type[]
@@ -584,6 +652,9 @@ class NERTransformer(BaseTransformer):
             pred_extract = x["pred_extract"]
             # preds (pred_extract)]
             for docid, temps_extract in zip(docids, pred_extract):
+                if len(list(itertools.chain(*temps_extract)))==0:
+                    preds[docid] = []
+                    continue
                 if docid not in preds:
                     preds[docid] = []
                     for temp_raw in temps_extract:
@@ -705,11 +776,11 @@ print("Training? {}".format(args.do_train))
 
 if args.do_train == "False":
     trained_model_path = StorageManager.get_local_copy(args.pretrained_path)
-    model = NERTransformer.load_from_checkpoint(trained_model_path)
+    model = NERTransformer.load_from_checkpoint(trained_model_path, hparams = args)
 else:
     model = NERTransformer(args)
 
 trainer = generic_train(model, args)
 result = trainer.test(model)
-# task.upload_artifact("predictions", result)
-# task.close()
+task.upload_artifact("predictions", result)
+task.close()

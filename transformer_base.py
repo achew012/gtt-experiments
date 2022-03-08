@@ -48,8 +48,8 @@ class BaseTransformer(pl.LightningModule):
         "Initialize a model."
 
         super(BaseTransformer, self).__init__()
-        self.hparams = params
-        # self.hparams.update(vars(params))
+        # self.hparams = params
+        self.hparams.update(vars(params))
         self.hparams.model_type = self.hparams.model_type.lower()
 
         config = AutoConfig.from_pretrained(self.hparams.model_name_or_path, max_position_embeddings=1024)
@@ -291,7 +291,7 @@ def generic_train(model, args):
 
     trainer = pl.Trainer(**train_params)
 
-    if args.do_train:
+    if args.do_train!="False":
         trainer.fit(model)
 
     return trainer
